@@ -14,18 +14,25 @@ Inputs & preprocessing
 
 We have 4 files to open in this case. We've already decided which columns we are dropping, and hence we only read select number of columns.
 
-```{r inputs, echo=FALSE}
+```{r mutant_export input, echo=FALSE}
+mutant_export <- fread('CosmicMutantExport.tsv', sep = '\t', header = TRUE, drop = c("Accession Number", "Gene CDS length", "HGNC ID", "Sample name", "ID_sample", "ID_tumour", "Pubmed_PMID", "ID_STUDY"))
+```
+
+```{r rest_mut input, echo=FALSE}
+res_mut <- fread('CosmicResistanceMutations.tsv', sep = '\t', header = TRUE, drop=c("Sample Name", "Sample ID", "Transcript", "Pubmed Id", "CGP Study"))
+```
+
+```{r reamining inputs, echo=FALSE}
 coding_muts <- fread('CosmicCodingMuts.vcf')
-mutant_export <- read.table('CosmicMutantExport.tsv', sep = '\t', header = TRUE)
 non_coding_var <- fread("CosmicNonCodingVariants.vcf")
-res_mut <- read.table('CosmicResistanceMutations.tsv', sep = '\t', header = TRUE)
 ```
 
-Preprocessing
+Data Exploration
 
-We shall drop the columns that are not necessary from each df
+We shall now explore each dataset to see if there exists any meaningful factors.
 
-```{r preprocessing, echo=FALSE}
-select(mutant_export, -c(Accession.Number, Gene.CDS.length, HGNC.ID, Sample.name, ID_sample, ID_tumour, Pubmed_PMID, ID_STUDY))
-```
+coding_muts EDA
+First we want to see if #CHROM, POS and ID are all unique for each data point. If so then we can drop them.
+
+```{r coding_muts_eda, echo=FALSE}
 
