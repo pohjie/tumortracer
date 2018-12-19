@@ -23,8 +23,8 @@ res_mut <- fread('CosmicResistanceMutations.tsv', sep = '\t', header = TRUE, dro
 ```
 
 ```{r reamining inputs, echo=FALSE}
-coding_muts <- fread('CosmicCodingMuts.vcf')
-non_coding_var <- fread("CosmicNonCodingVariants.vcf")
+coding_muts <- fread('CosmicCodingMuts.vcf', drop=c("ID", "QUAL", "FILTER"))
+non_coding_var <- fread("CosmicNonCodingVariants.vcf", drop=c("ID", "QUAL", "FILTER"))
 ```
 
 Data Exploration
@@ -32,7 +32,37 @@ Data Exploration
 We shall now explore each dataset to see if there exists any meaningful factors.
 
 coding_muts EDA
-First we want to see if #CHROM, POS and ID are all unique for each data point. If so then we can drop them.
+First we want to see if #CHROM, POS and ID are all unique for each data point. If so then we can drop them (by not reading them).
 
 ```{r coding_muts_eda, echo=FALSE}
+length(unique(coding_muts$`#CHROM`)) == nrow(coding_muts)
+length(unique(coding_muts$POS)) == nrow(coding_muts)
+# length(unique(coding_muts$ID)) == nrow(coding_muts)
 
+# see all the unique values for each column
+length(unique(coding_muts$`#CHROM`))
+length(unique(coding_muts$POS))
+length(unique(coding_muts$REF))
+length(unique(coding_muts$ALT))
+length(unique(coding_muts$INFO))
+```
+
+non_coding_var EDA
+```{r non_conding_var_eda, echo=FALSE}
+length(unique(non_coding_var$`#CHROM`)) == nrow(non_coding_var)
+length(unique(non_coding_var$POS)) == nrow(non_coding_var)
+# length(unique(non_coding_var$ID)) == nrow(non_coding_var)
+
+# see all the unique values for each column
+length(unique(non_coding_var$`#CHROM`))
+length(unique(non_coding_var$POS))
+length(unique(non_coding_var$REF))
+length(unique(non_coding_var$ALT))
+length(unique(non_coding_var$INFO))
+```
+
+We can see that aside from #CHROM, most of the multi-class features have at least tens of thousands of categories. Hence it will be unwise to use a histogram to plot the data. Hence we shall just focus on plotting histogram for #CHROM for the coding_muts and non_coding_var.
+
+```{r hist_for_#CHROM, echo=FALSE}
+
+```
