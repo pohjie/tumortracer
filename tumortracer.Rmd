@@ -10,12 +10,20 @@ library(data.table)
 library(dplyr)
 ```
 
+Functions
+```{r functions, echo=FALSE}
+mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+```
+
 Inputs & preprocessing
 
 We have 4 files to open in this case. We've already decided which columns we are dropping, and hence we only read select number of columns.
 
 ```{r mutant_export input, echo=FALSE}
-mutant_export <- fread('CosmicMutantExport.tsv', sep = '\t', header = TRUE, drop = c("Accession Number", "Gene CDS length", "HGNC ID", "Sample name", "ID_sample", "ID_tumour", "Pubmed_PMID", "ID_STUDY"))
+mutant_export <- fread('CosmicMutantExport.tsv', sep = '\t', header = TRUE, drop = c("Accession Number", "Gene CDS length", "HGNC ID", "Sample name", "ID_sample", "ID_tumour", "Pubmed_PMID", "ID_STUDY", "Mutation strand", "GRCh", "Resistance Mutation"), na.strings=c("", " ", "-", "NA", "NaN"))
 ```
 
 ```{r rest_mut input, echo=FALSE}
@@ -93,3 +101,20 @@ barplot(table(mutant_export$`FATHMM prediction`))
 ```
 
 The next question arises- what is the relation between the different files? Note that we have different number of rows- i.e. we canot map the data rows to each other. 
+
+We shall leave that question behind for now and instead focus on handling the missing data. Note that we ony use mutant_export as we will be training predominantly on that data file. In addition, we have to replace NA with other values as there are only 46 rows of data that do not have any NA at all.
+
+For numerical data, we shall take the average. For categorical data, we shall take the most frequently appeared.
+
+```{r replace_NA, echo=FALSE}
+mutant_export$`Mutation zygosity`[is.na(mutant_export$`Mutation zygosity`)] <- mode(mutant_export$`Mutation zygosity`[!is.na(mutant_export$`Mutation zygosity`)])
+mutant_export$`Mutation genome position`[is.na(mutant_export$`Mutation genome position`)] <- mode(mutant_export$`Mutation genome position`[!is.na(mutant_export$`Mutation genome position`)])
+mutant_export$`SNP`[is.na(mutant_export$`SNP`)] <- mode(mutant_export$`SNP`[!is.na(mutant_export$`SNP`)])
+mutant_export$`FATHMM prediction`[is.na(mutant_export$`FATHMM prediction`)] <- mode(mutant_export$`FATHMM prediction`[!is.na(mutant_export$`FATHMM prediction`)])
+mutant_export$`FATHMM score`[is.na(mutant_export$`FATHMM score`)] <- mean(mutant_export$`FATHMM score`[!is.na(mutant_export$`FATHMM score`)])
+mutant_export$`Sample Type`[is.na(mutant_export$`Sample Type`)] <- mode(mutant_export$`Sample Type`[!is.na(mutant_export$`Sample Type`)])
+mutant_export$`Tumour origin`[is.na(mutant_export$`Tumour origin`)] <- mode(mutant_export$`Tumour origin`[!is.na(mutant_export$`Tumour origin`)])
+mutant_export$`Age`[is.na(mutant_export$`Age`)] <- mean(mutant_export$`Age`[!is.na(mutant_export$`Age`)])
+```
+
+Note: There is data snooping here as I've filled in the NAs with mode and mean, then split into test and train. Should be doing this in reverse.
