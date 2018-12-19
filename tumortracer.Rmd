@@ -63,6 +63,33 @@ length(unique(non_coding_var$INFO))
 
 We can see that aside from #CHROM, most of the multi-class features have at least tens of thousands of categories. Hence it will be unwise to use a histogram to plot the data. Hence we shall just focus on plotting histogram for #CHROM for the coding_muts and non_coding_var.
 
-```{r hist_for_#CHROM, echo=FALSE}
-
+```{r hist_for_coding_muts_#CHROM, echo=FALSE}
+barplot(table(coding_muts$`#CHROM`))
 ```
+
+There seems to be no clear pattern or distribution we can get from the coding_muts. Let's plot the histogram for non_coding_var.
+
+```{r hist_for_non_coding_var_#CHROM, echo=FALSE}
+barplot(table(non_coding_var$`#CHROM`))
+```
+
+Again, there seems to be no clear distribution from non_coding_var. Now we shall move on to understand what coding_muts and non_coding_var actually means.
+
+coding_muts and non_coding_var are actually files containing coding and non-coding mutations, i.e. whether the mutation is "embedded" in the DNA. Right now I don't understand what do the columns mean, but I shall just take them as "features" and hopefully understand them as we move along.
+
+Next we shall move on to do EDA of mutant_export.
+```{r mutant_export_eda, echo=FALSE}
+colnames(mutant_export)
+for (i in 1:ncol(mutant_export)) {
+  print(colnames(mutant_export)[i])
+  print(length(unique(mutant_export[[i]])))
+}
+```
+
+Generally we can see that the number of values for each category can range from very low (< 10) up till tens of thousands. Hence we shall not examine in detail any feature. Instead, we shall come back and examine if necessary as we move on in our model building.
+
+```{r hist_for_non_coding_var_#CHROM, echo=FALSE}
+barplot(table(mutant_export$`FATHMM prediction`))
+```
+
+The next question arises- what is the relation between the different files? Note that we have different number of rows- i.e. we canot map the data rows to each other. 
