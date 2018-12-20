@@ -1,0 +1,45 @@
+---
+title: "hk_tumortracer"
+author: "Poh Jie"
+date: "20/12/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(data.table)
+```
+
+## This Markdown document is to follow the study published by The Hong Kong University of Science and Technology. My previous document did not follow the steps outlined in the research paper.
+
+# I believe the sample name corresponds to the "specimens" as mentioned in the research paper. However, I have more samples than listed (355135 in my data vs 235589 in the research paper).
+
+Reading input ('CosmicMutantExport.tsv')
+
+```{r input, echo=FALSE}
+mutant_export <- fread('CosmicMutantExport.tsv', sep = '\t', header = TRUE, na.strings=c("", " ", "-", "NA", "NaN"))
+```
+
+Preprocessing of data
+
+According to the research paper, we are supposed to remove "227,512 specimens not labeled as “Genome.wide.screen” and 5,064 specimens labeled as cell-line (in union 227,757 specimens)".
+
+We shall begin by removing those labeled 'n' for "Genome.wide.screen".
+```{r preprocessing_easy, echo=FALSE}
+mutant_export <- mutant_export[mutant_export$`Genome-wide screen`=='y' & 
+                                 mutant_export$`Sample Type` != 'cell-line', ]
+```
+
+Next, we move on to the tougher preprocessing part, whereby we want all tumour ID to have only 1 specimen.
+
+```{r preprocessing_hard, echo=FALSE}
+all_tumour_ID <- unique(mutant_export$ID_tumour)
+# we chose not 1 condition instead of choose multiple conditions
+crit_1 <- mutant_export$`Sample Type` != 'xenograft'
+crit_2 <- (mutant_export$`Mutation somatic status` == 'Confirmed somatic variant') | (mutant_export$`Mutation somatic status` == 'Reported in another cancer sample as somatic')
+crit_3 <- mutant_export$`Tumour origin` == 'primary'
+
+mutant_export_cleaned <- mutant_export[mutant_export$ID_tumour == all_tumour_ID[1] 
+                                       & crit_1 & crit_2 & crit_3]
+
+```
