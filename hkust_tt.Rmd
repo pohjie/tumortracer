@@ -7,8 +7,18 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(caret)
 library(data.table)
 library(dplyr)
+library(qdapTools)
+```
+
+Functions
+```{r functions, echo=FALSE}
+mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
 ```
 
 ## This Markdown document is to follow the study published by The Hong Kong University of Science and Technology. My previous document did not follow the steps outlined in the research paper.
@@ -18,7 +28,9 @@ library(dplyr)
 Reading input ('CosmicMutantExport.tsv')
 
 ```{r input, echo=FALSE}
+
 mutant_export <- fread('CosmicMutantExport.tsv', sep = '\t', header = TRUE, na.strings=c("", " ", "-", "NA", "NaN"), check.names = TRUE)
+
 ```
 
 Preprocessing of data
@@ -27,7 +39,9 @@ According to the research paper, we are supposed to remove "227,512 specimens no
 
 We shall begin by removing those labeled 'n' for "Genome.wide.screen".
 ```{r preprocessing_easy, echo=FALSE}
+
 mutant_export <- mutant_export[Genome.wide.screen =='y' & Sample.Type != 'cell-line', ]
+
 ```
 
 Next, we move on to the tougher preprocessing part, whereby we want all tumour ID to have only 1 specimen.
@@ -41,11 +55,11 @@ good_tumor_sample <- mutant_export[,{
   crit_3 <- Tumour.origin == 'primary'
   crit_all <- crit_1 & crit_2 & crit_3
   chosen_sample <- 0L
-  if(length(uniq_sample) > 1){
-    if(any(crit_all)){
+  if (length(uniq_sample) > 1) {
+    if (any(crit_all)) {
       chosen_sample <- sample(ID_sample[crit_all], 1)
     }
-  }else{
+  } else {
     chosen_sample <- uniq_sample
   }
   list(ID_sample_picked = chosen_sample)
@@ -59,39 +73,22 @@ mutant_export_cleaned <- mutant_export[tumor_sample_ID %in% good_tumor_sample2$t
 
 ```
 
+Now that we have preprocessed the data, the next stage is to prepare the X and Y. 
+```{r create_X, echo=FALSE}
 
+X <- select(mutant_export_cleaned, ID_tumour, Mutation.ID, Primary.site)
+X_one <- aggregate(Mutation.ID~ID_tumour, X, FUN=toString)
+X_two <- aggregate(Primary.site~ID_tumour, X, FUN=mode)
+X <- merge(X_one, X_two, by='ID_tumour')
 
+# export as csv to do one-hot encoding in python
+#lapply(X, function(x) write.table(data.frame(x), 'X.csv', append= T, sep=',' ))
 
-
-
-all_tumour_ID <- unique(mutant_export$ID_tumour)
-# we chose not 1 condition instead of choose multiple conditions
-crit_1 <- mutant_export$`Sample Type` != 'xenograft'
-crit_2 <- mutant_export$`Mutation somatic status` == 'Confirmed somatic variant'
-crit_3 <- mutant_export$`Tumour origin` == 'primary'
-
-mutant_export_cleaned <- mutant_export[mutant_export$ID_tumour == all_tumour_ID[1] 
-                                       & crit_1 & crit_2 & crit_3]
-mutant_export_cleaned <- sample_n(mutant_export_cleaned, 1)
-
-for (i in 2:length(all_tumour_ID)) {
-  mutant_export_here <- mutant_export[
-  mutant_export_here <- sample(mutant_export_here, 1)
-  mutant_export_cleaned <- rbind(mutant_export_cleaned, mutant_export_here, fill=TRUE)
-  
-  if (i %% 500 == 0) {
-    print(i)
-  }
-}
-```
-```{r}
-mutant_export$ID_tumour == all_tumour_ID[i] & crit_1 & crit_2 & crit_3]
+# write.csv(X, file = 'X.csv')
 ```
 
+```{r one_hot, echo=FALSE}
 
+X <- cbind(X, mtabulate(strsplit(X$Mutation.ID, ", ")))
 
-
-
-
-
-
+```
