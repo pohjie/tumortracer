@@ -21,6 +21,7 @@ mode <- function(x) {
   ux <- unique(x)
   ux[which.max(tabulate(match(x, ux)))]
 }
+
 ```
 
 ## This Markdown document is to follow the study published by The Hong Kong University of Science and Technology. My previous document did not follow the steps outlined in the research paper.
@@ -98,4 +99,5 @@ train_primary <- X_primary_site[train_indices,]
 
 test_mutation <- X_casted[-train_indices,]
 test_primary <- X_primary_site[-train_indices,]
+
 ```
