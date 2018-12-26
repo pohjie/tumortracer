@@ -7,6 +7,21 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+library(data.table)
+library(dplyr)
+library(qdapTools)
+library(Matrix.utils)
+library(keras)
+```
+
+Functions
+```{r functions, echo=FALSE}
+mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+
 ```
 
 ## This Markdown document is to follow the study published by The Hong Kong University of Science and Technology. My previous document did not follow the steps outlined in the research paper.
@@ -16,7 +31,9 @@ knitr::opts_chunk$set(echo = TRUE)
 Reading input ('CosmicMutantExport.tsv')
 
 ```{r input, echo=FALSE}
-mutant_export <- fread('CosmicMutantExport.tsv', sep = '\t', header = TRUE, na.strings=c("", " ", "-", "NA", "NaN"))
+
+mutant_export <- fread('CosmicMutantExport.tsv', sep = '\t', header = TRUE, na.strings=c("", " ", "-", "NA", "NaN"), check.names = TRUE)
+
 ```
 
 Preprocessing of data
@@ -25,25 +42,62 @@ According to the research paper, we are supposed to remove "227,512 specimens no
 
 We shall begin by removing those labeled 'n' for "Genome.wide.screen".
 ```{r preprocessing_easy, echo=FALSE}
-mutant_export <- mutant_export[mutant_export$`Genome-wide screen`=='y' & 
-                                 mutant_export$`Sample Type` != 'cell-line', ]
+
+mutant_export <- mutant_export[Genome.wide.screen =='y' & Sample.Type != 'cell-line' & Mutation.Description != 'Substitution - coding silent', ]
+
 ```
 
 Next, we move on to the tougher preprocessing part, whereby we want all tumour ID to have only 1 specimen.
 
-```{r preprocessing_search, echo=FALSE}
-for (i in 1:ncol(mutant_export)) {
-  col <- colnames(mutant_export)[i]
-  if (any(mutant_export$col == 'xenograft')) {
-    print(col)
+```{r preprocessing_hard, echo=FALSE}
+
+good_tumor_sample <- mutant_export[,{
+  uniq_sample <- unique(ID_sample)
+  crit_1 <- Sample.Type != 'xenograft'
+  crit_2 <- Mutation.somatic.status == 'Confirmed somatic variant'
+  crit_3 <- Tumour.origin == 'primary'
+  crit_all <- crit_1 & crit_2 & crit_3
+  chosen_sample <- 0L
+  if (length(uniq_sample) > 1) {
+    if (any(crit_all)) {
+      chosen_sample <- sample(ID_sample[crit_all], 1)
+    }
+  } else {
+    chosen_sample <- uniq_sample
   }
-  else {
-    print(i)
-  }
-}
+  list(ID_sample_picked = chosen_sample)
+},by=ID_tumour]
+
+good_tumor_sample2 <- good_tumor_sample[ID_sample_picked != 0, .(tumor_sample_ID=paste(ID_tumour, ID_sample_picked, sep = "$"))]
+
+mutant_export[,tumor_sample_ID:=paste(ID_tumour, ID_sample, sep = "$")]
+
+mutant_export_cleaned <- mutant_export[tumor_sample_ID %in% good_tumor_sample2$tumor_sample_ID,]
+
 ```
 
-```{r preprocessing_hard, echo=FALSE}
-all_tumour_ID <- unique(mutant_export$ID_tumour)
-crit_1 <- mutant_export$
+Now that we have preprocessed the data, the next stage is to prepare the X and Y. 
+
+```{r one_hot, echo=FALSE}
+X <- select(mutant_export_cleaned, ID_tumour, Mutation.ID, Primary.site)
+
+X$appearance <- 1
+X_casted <- dMcast(X, ID_tumour ~ Mutation.ID, value.var = "appearance", fun.aggregate = sum)
+X_primary_site <- aggregate(Primary.site~ID_tumour, X, FUN=mode)
+```
+
+```{r train_test_split, echo=FALSE}
+
+sample_size <- floor(0.8 * nrow(X_primary_site))
+
+# set seed for reproducible results
+set.seed(101)
+train_indices <- sample(seq_len(nrow(X_primary_site)), size=sample_size)
+
+train_mutation <- X_casted[train_indices,]
+train_primary <- X_primary_site[train_indices,]
+
+test_mutation <- X_casted[-train_indices,]
+test_primary <- X_primary_site[-train_indices,]
+
 ```

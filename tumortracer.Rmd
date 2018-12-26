@@ -10,34 +10,111 @@ library(data.table)
 library(dplyr)
 ```
 
-Inputs
-
-We have 4 files to open in this case. 
-
-```{r inputs, echo=FALSE}
-coding_muts <- fread('CosmicCodingMuts.vcf')
-mutant_export <- read.table('CosmicMutantExport.tsv', sep = '\t', header = TRUE)
-non_coding_var <- fread("CosmicNonCodingVariants.vcf")
-res_mut <- read.table('CosmicResistanceMutations.tsv', sep = '\t', header = TRUE)
+Functions
+```{r functions, echo=FALSE}
+mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
 ```
 
-Visual inspection of each file
-coding_muts: 
+Inputs & preprocessing
 
-```{r tabsets, echo=FALSE}
-shinyAppDir(
-  system.file("examples/06_tabsets", package = "shiny"),
-  options = list(
-    width = "100%", height = 550
-  )
-)
+We have 4 files to open in this case. We've already decided which columns we are dropping, and hence we only read select number of columns.
+
+```{r mutant_export input, echo=FALSE}
+mutant_export <- fread('CosmicMutantExport.tsv', sep = '\t', header = TRUE, drop = c("Accession Number", "Gene CDS length", "HGNC ID", "Sample name", "ID_sample", "ID_tumour", "Pubmed_PMID", "ID_STUDY", "Mutation strand", "GRCh", "Resistance Mutation"), na.strings=c("", " ", "-", "NA", "NaN"))
 ```
 
-Note the use of the `height` parameter to determine how much vertical space the embedded application should occupy.
+```{r rest_mut input, echo=FALSE}
+res_mut <- fread('CosmicResistanceMutations.tsv', sep = '\t', header = TRUE, drop=c("Sample Name", "Sample ID", "Transcript", "Pubmed Id", "CGP Study"))
+```
 
-You can also use the `shinyApp` function to define an application inline rather then in an external directory.
+```{r reamining inputs, echo=FALSE}
+coding_muts <- fread('CosmicCodingMuts.vcf', drop=c("ID", "QUAL", "FILTER"))
+non_coding_var <- fread("CosmicNonCodingVariants.vcf", drop=c("ID", "QUAL", "FILTER"))
+```
 
-In all of R code chunks above the `echo = FALSE` attribute is used. This is to prevent the R code within the chunk from rendering in the document alongside the Shiny components.
+Data Exploration
 
+We shall now explore each dataset to see if there exists any meaningful factors.
 
+coding_muts EDA
+First we want to see if #CHROM, POS and ID are all unique for each data point. If so then we can drop them (by not reading them).
 
+```{r coding_muts_eda, echo=FALSE}
+length(unique(coding_muts$`#CHROM`)) == nrow(coding_muts)
+length(unique(coding_muts$POS)) == nrow(coding_muts)
+# length(unique(coding_muts$ID)) == nrow(coding_muts)
+
+# see all the unique values for each column
+length(unique(coding_muts$`#CHROM`))
+length(unique(coding_muts$POS))
+length(unique(coding_muts$REF))
+length(unique(coding_muts$ALT))
+length(unique(coding_muts$INFO))
+```
+
+non_coding_var EDA
+```{r non_conding_var_eda, echo=FALSE}
+length(unique(non_coding_var$`#CHROM`)) == nrow(non_coding_var)
+length(unique(non_coding_var$POS)) == nrow(non_coding_var)
+# length(unique(non_coding_var$ID)) == nrow(non_coding_var)
+
+# see all the unique values for each column
+length(unique(non_coding_var$`#CHROM`))
+length(unique(non_coding_var$POS))
+length(unique(non_coding_var$REF))
+length(unique(non_coding_var$ALT))
+length(unique(non_coding_var$INFO))
+```
+
+We can see that aside from #CHROM, most of the multi-class features have at least tens of thousands of categories. Hence it will be unwise to use a histogram to plot the data. Hence we shall just focus on plotting histogram for #CHROM for the coding_muts and non_coding_var.
+
+```{r hist_for_coding_muts_#CHROM, echo=FALSE}
+barplot(table(coding_muts$`#CHROM`))
+```
+
+There seems to be no clear pattern or distribution we can get from the coding_muts. Let's plot the histogram for non_coding_var.
+
+```{r hist_for_non_coding_var_#CHROM, echo=FALSE}
+barplot(table(non_coding_var$`#CHROM`))
+```
+
+Again, there seems to be no clear distribution from non_coding_var. Now we shall move on to understand what coding_muts and non_coding_var actually means.
+
+coding_muts and non_coding_var are actually files containing coding and non-coding mutations, i.e. whether the mutation is "embedded" in the DNA. Right now I don't understand what do the columns mean, but I shall just take them as "features" and hopefully understand them as we move along.
+
+Next we shall move on to do EDA of mutant_export.
+```{r mutant_export_eda, echo=FALSE}
+colnames(mutant_export)
+for (i in 1:ncol(mutant_export)) {
+  print(colnames(mutant_export)[i])
+  print(length(unique(mutant_export[[i]])))
+}
+```
+
+Generally we can see that the number of values for each category can range from very low (< 10) up till tens of thousands. Hence we shall not examine in detail any feature. Instead, we shall come back and examine if necessary as we move on in our model building.
+
+```{r hist_for_non_coding_var_#CHROM, echo=FALSE}
+barplot(table(mutant_export$`FATHMM prediction`))
+```
+
+The next question arises- what is the relation between the different files? Note that we have different number of rows- i.e. we canot map the data rows to each other. 
+
+We shall leave that question behind for now and instead focus on handling the missing data. Note that we ony use mutant_export as we will be training predominantly on that data file. In addition, we have to replace NA with other values as there are only 46 rows of data that do not have any NA at all.
+
+For numerical data, we shall take the average. For categorical data, we shall take the most frequently appeared.
+
+```{r replace_NA, echo=FALSE}
+mutant_export$`Mutation zygosity`[is.na(mutant_export$`Mutation zygosity`)] <- mode(mutant_export$`Mutation zygosity`[!is.na(mutant_export$`Mutation zygosity`)])
+mutant_export$`Mutation genome position`[is.na(mutant_export$`Mutation genome position`)] <- mode(mutant_export$`Mutation genome position`[!is.na(mutant_export$`Mutation genome position`)])
+mutant_export$`SNP`[is.na(mutant_export$`SNP`)] <- mode(mutant_export$`SNP`[!is.na(mutant_export$`SNP`)])
+mutant_export$`FATHMM prediction`[is.na(mutant_export$`FATHMM prediction`)] <- mode(mutant_export$`FATHMM prediction`[!is.na(mutant_export$`FATHMM prediction`)])
+mutant_export$`FATHMM score`[is.na(mutant_export$`FATHMM score`)] <- mean(mutant_export$`FATHMM score`[!is.na(mutant_export$`FATHMM score`)])
+mutant_export$`Sample Type`[is.na(mutant_export$`Sample Type`)] <- mode(mutant_export$`Sample Type`[!is.na(mutant_export$`Sample Type`)])
+mutant_export$`Tumour origin`[is.na(mutant_export$`Tumour origin`)] <- mode(mutant_export$`Tumour origin`[!is.na(mutant_export$`Tumour origin`)])
+mutant_export$`Age`[is.na(mutant_export$`Age`)] <- mean(mutant_export$`Age`[!is.na(mutant_export$`Age`)])
+```
+
+Note: There is data snooping here as I've filled in the NAs with mode and mean, then split into test and train. Should be doing this in reverse.
