@@ -21,7 +21,6 @@ mode <- function(x) {
   ux <- unique(x)
   ux[which.max(tabulate(match(x, ux)))]
 }
-
 ```
 
 ## This Markdown document is to follow the study published by The Hong Kong University of Science and Technology. My previous document did not follow the steps outlined in the research paper.
@@ -79,11 +78,12 @@ mutant_export_cleaned <- mutant_export[tumor_sample_ID %in% good_tumor_sample2$t
 Now that we have preprocessed the data, the next stage is to prepare the X and Y. 
 
 ```{r one_hot, echo=FALSE}
-X <- select(mutant_export_cleaned, ID_tumour, Mutation.ID, Primary.site)
+X <- select(mutant_export_cleaned, ID_tumour, Mutation.ID, Primary.site, Tumour.origin)
 
 X$appearance <- 1
-X_casted <- dMcast(X, ID_tumour ~ Mutation.ID, value.var = "appearance", fun.aggregate = sum)
+X_casted <- dMcast(X, ID_tumour ~ Mutation.ID, value.var = "appearance", fun.aggregate = "sum")
 X_primary_site <- aggregate(Primary.site~ID_tumour, X, FUN=mode)
+X_tumour_origin <- aggregate(Tumour.origin~ID_tumour, X, FUN=mode)
 ```
 
 ```{r train_test_split, echo=FALSE}
@@ -96,8 +96,14 @@ train_indices <- sample(seq_len(nrow(X_primary_site)), size=sample_size)
 
 train_mutation <- X_casted[train_indices,]
 train_primary <- X_primary_site[train_indices,]
+train_origin <- X_tumour_origin[train_indices,]
 
 test_mutation <- X_casted[-train_indices,]
 test_primary <- X_primary_site[-train_indices,]
+test_origin <- X_tumour_origin[-train_indices]
+```
+
+```{r nn_training, echo=FALSE}
+
 
 ```
