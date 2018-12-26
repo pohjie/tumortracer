@@ -12,6 +12,7 @@ library(data.table)
 library(dplyr)
 library(qdapTools)
 library(Matrix.utils)
+library(keras)
 ```
 
 Functions
@@ -80,7 +81,21 @@ Now that we have preprocessed the data, the next stage is to prepare the X and Y
 X <- select(mutant_export_cleaned, ID_tumour, Mutation.ID, Primary.site)
 
 X$appearance <- 1
-X_casted <- dMcast(X, ID_tumour ~ Mutation.ID, value.var = "appearance", fun = sum)
-X_primary <- aggregate(Primary.site~ID_tumour, X, FUN=mode)
+X_casted <- dMcast(X, ID_tumour ~ Mutation.ID, value.var = "appearance", fun.aggregate = sum)
+X_primary_site <- aggregate(Primary.site~ID_tumour, X, FUN=mode)
 ```
 
+```{r train_test_split, echo=FALSE}
+
+sample_size <- floor(0.8 * nrow(X_primary_site))
+
+# set seed for reproducible results
+set.seed(101)
+train_indices <- sample(seq_len(nrow(X_primary_site)), size=sample_size)
+
+train_mutation <- X_casted[train_indices,]
+train_primary <- X_primary_site[train_indices,]
+
+test_mutation <- X_casted[-train_indices,]
+test_primary <- X_primary_site[-train_indices,]
+```
