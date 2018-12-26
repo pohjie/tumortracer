@@ -40,7 +40,7 @@ According to the research paper, we are supposed to remove "227,512 specimens no
 We shall begin by removing those labeled 'n' for "Genome.wide.screen".
 ```{r preprocessing_easy, echo=FALSE}
 
-mutant_export <- mutant_export[Genome.wide.screen =='y' & Sample.Type != 'cell-line', ]
+mutant_export <- mutant_export[Genome.wide.screen =='y' & Sample.Type != 'cell-line' & Mutation.Description != 'Substitution - coding silent', ]
 
 ```
 
@@ -74,6 +74,12 @@ mutant_export_cleaned <- mutant_export[tumor_sample_ID %in% good_tumor_sample2$t
 ```
 
 Now that we have preprocessed the data, the next stage is to prepare the X and Y. 
+
+```{r casting, echo=FALSE}
+X <- select(mutant_export_cleaned, ID_tumour, Mutation.ID, Primary.site)
+X_casted <- dcast(X, ID_tumour ~ Mutation.ID)
+```
+
 ```{r create_X, echo=FALSE}
 
 X <- select(mutant_export_cleaned, ID_tumour, Mutation.ID, Primary.site)
