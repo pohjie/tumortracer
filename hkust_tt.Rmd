@@ -11,6 +11,7 @@ library(caret)
 library(data.table)
 library(dplyr)
 library(qdapTools)
+library(Matrix.utils)
 ```
 
 Functions
@@ -75,26 +76,11 @@ mutant_export_cleaned <- mutant_export[tumor_sample_ID %in% good_tumor_sample2$t
 
 Now that we have preprocessed the data, the next stage is to prepare the X and Y. 
 
-```{r casting, echo=FALSE}
-X <- select(mutant_export_cleaned, ID_tumour, Mutation.ID, Primary.site)
-X_casted <- dcast(X, ID_tumour ~ Mutation.ID)
-```
-
-```{r create_X, echo=FALSE}
-
-X <- select(mutant_export_cleaned, ID_tumour, Mutation.ID, Primary.site)
-X_one <- aggregate(Mutation.ID~ID_tumour, X, FUN=toString)
-X_two <- aggregate(Primary.site~ID_tumour, X, FUN=mode)
-X <- merge(X_one, X_two, by='ID_tumour')
-
-# export as csv to do one-hot encoding in python
-#lapply(X, function(x) write.table(data.frame(x), 'X.csv', append= T, sep=',' ))
-
-# write.csv(X, file = 'X.csv')
-```
-
 ```{r one_hot, echo=FALSE}
+X <- select(mutant_export_cleaned, ID_tumour, Mutation.ID, Primary.site)
 
-X <- cbind(X, mtabulate(strsplit(X$Mutation.ID, ", ")))
-
+X$appearance <- 1
+X_casted <- dMcast(X, ID_tumour ~ Mutation.ID, value.var = "appearance", fun = sum)
+X_primary <- aggregate(Primary.site~ID_tumour, X, FUN=mode)
 ```
+
