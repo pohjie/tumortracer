@@ -81,31 +81,21 @@ mutant_export_cleaned <- mutant_export[tumor_sample_ID %in% good_tumor_sample2$t
 
 Now that we have preprocessed the data, the next stage is to prepare the X and Y. 
 
-```{r one_hot_simult, echo=FALSE}
-input <- select(mutant_export_cleaned, ID_tumour, Mutation.ID, Primary.site, Tumour.origin)
-
-input$appearance <- 1
-input_casted <- dMcast(input, ID_tumour ~ Mutation.ID, value.var = "appearance", fun.aggregate = "sum")
-
-input$origin <- 1
-input_origin <- dMcast(input, ID_tumour ~ Tumour.origin, value.var = 'origin')
-
-```
-
 ```{r one_hot, echo=FALSE}
 input <- select(mutant_export_cleaned, ID_tumour, Mutation.ID, Primary.site, Tumour.origin)
 
 input$appearance <- 1
 input_mutation <- dMcast(input, ID_tumour ~ Mutation.ID, value.var = "appearance", fun.aggregate = "sum")
+input_mutation@x <- as.numeric(input_mutation@x > 0)
 
-#input_tumour_origin <- aggregate(Tumour.origin~ID_tumour, input, FUN=mode)
-#input_tumour_origin <- Matrix(as.matrix(input_tumour_origin), sparse=TRUE)
+input$origin <- 1
+input_origin <- dMcast(input, ID_tumour ~ Tumour.origin, value.var = 'origin')
+input_origin@x <- as.numeric(input_origin@x > 0)
 
-#input_primary <- dMcast(input, ID_tumour ~ Primary.site, value.var = "appearance", fun.aggregate=mode)
 input_primary_site <- aggregate(Primary.site~ID_tumour, input, FUN=mode)
 input_primary_site <- Matrix(as.matrix(input_primary_site), sparse=TRUE)
 
-input_processed <- cbind(input_casted, input_primary_site, input_tumour_origin)
+input_processed <- cbind(input_mutation, input_primary_site, input_origin)
 ```
 
 ```{r train_test_split, echo=FALSE}
@@ -116,22 +106,11 @@ sample_size <- floor(0.8 * nrow(input_processed))
 set.seed(101)
 train_indices <- sample(seq_len(nrow(input_processed)), size=sample_size)
 
-#train_mutation <- X_casted[train_indices,]
-#train_origin <- Matrix(data.matrix(X_tumour_origin[train_indices,]), sparse=TRUE)
-#train_origin[is.na(train_origin)] <- 0
-
-#train_X <- cbind(train_mutation, train_origin)
-#train_y <- X_primary_site[train_indices,]
-
 train_X <- input_processed[train_indices, names(input_processed) != 'Primary.site']
 train_y <- input_processed[train_indices, 'Primary.site']
 
-#test_mutation <- X_casted[-train_indices,]
-#test_origin <- Matrix(data.matrix(X_tumour_origin[-train_indices,]), sparse=TRUE)
-#test_origin[is.na(test_origin)] <- 0
-
-#test_X <- cbind(test_mutation, test_origin)
-#test_y <- X_primary_site[-train_indices,]
+test_X <- input_processed[-train_indices, names(input_processed) != 'Primary.site']
+test_y <- input_processed[-train_indices, 'Primary.site']
 ```
 
 ```{r svm, echo=FALSE}
