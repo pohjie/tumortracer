@@ -12,7 +12,11 @@ library(data.table)
 library(dplyr)
 library(qdapTools)
 library(Matrix.utils)
+library(bit64)
+
+library(e1071)
 library(keras)
+
 ```
 
 Functions
@@ -21,7 +25,6 @@ mode <- function(x) {
   ux <- unique(x)
   ux[which.max(tabulate(match(x, ux)))]
 }
-
 ```
 
 ## This Markdown document is to follow the study published by The Hong Kong University of Science and Technology. My previous document did not follow the steps outlined in the research paper.
@@ -78,26 +81,60 @@ mutant_export_cleaned <- mutant_export[tumor_sample_ID %in% good_tumor_sample2$t
 
 Now that we have preprocessed the data, the next stage is to prepare the X and Y. 
 
-```{r one_hot, echo=FALSE}
-X <- select(mutant_export_cleaned, ID_tumour, Mutation.ID, Primary.site)
+```{r one_hot_simult, echo=FALSE}
+input <- select(mutant_export_cleaned, ID_tumour, Mutation.ID, Primary.site, Tumour.origin)
 
-X$appearance <- 1
-X_casted <- dMcast(X, ID_tumour ~ Mutation.ID, value.var = "appearance", fun.aggregate = sum)
-X_primary_site <- aggregate(Primary.site~ID_tumour, X, FUN=mode)
+input$appearance <- 1
+input_casted <- dMcast(input, ID_tumour ~ Mutation.ID, value.var = "appearance", fun.aggregate = "sum")
+
+input$origin <- 1
+input_origin <- dMcast(input, ID_tumour ~ Tumour.origin, value.var = 'origin')
+
+```
+
+```{r one_hot, echo=FALSE}
+input <- select(mutant_export_cleaned, ID_tumour, Mutation.ID, Primary.site, Tumour.origin)
+
+input$appearance <- 1
+input_mutation <- dMcast(input, ID_tumour ~ Mutation.ID, value.var = "appearance", fun.aggregate = "sum")
+
+#input_tumour_origin <- aggregate(Tumour.origin~ID_tumour, input, FUN=mode)
+#input_tumour_origin <- Matrix(as.matrix(input_tumour_origin), sparse=TRUE)
+
+#input_primary <- dMcast(input, ID_tumour ~ Primary.site, value.var = "appearance", fun.aggregate=mode)
+input_primary_site <- aggregate(Primary.site~ID_tumour, input, FUN=mode)
+input_primary_site <- Matrix(as.matrix(input_primary_site), sparse=TRUE)
+
+input_processed <- cbind(input_casted, input_primary_site, input_tumour_origin)
 ```
 
 ```{r train_test_split, echo=FALSE}
 
-sample_size <- floor(0.8 * nrow(X_primary_site))
+sample_size <- floor(0.8 * nrow(input_processed))
 
 # set seed for reproducible results
 set.seed(101)
-train_indices <- sample(seq_len(nrow(X_primary_site)), size=sample_size)
+train_indices <- sample(seq_len(nrow(input_processed)), size=sample_size)
 
-train_mutation <- X_casted[train_indices,]
-train_primary <- X_primary_site[train_indices,]
+#train_mutation <- X_casted[train_indices,]
+#train_origin <- Matrix(data.matrix(X_tumour_origin[train_indices,]), sparse=TRUE)
+#train_origin[is.na(train_origin)] <- 0
 
-test_mutation <- X_casted[-train_indices,]
-test_primary <- X_primary_site[-train_indices,]
+#train_X <- cbind(train_mutation, train_origin)
+#train_y <- X_primary_site[train_indices,]
 
+train_X <- input_processed[train_indices, names(input_processed) != 'Primary.site']
+train_y <- input_processed[train_indices, 'Primary.site']
+
+#test_mutation <- X_casted[-train_indices,]
+#test_origin <- Matrix(data.matrix(X_tumour_origin[-train_indices,]), sparse=TRUE)
+#test_origin[is.na(test_origin)] <- 0
+
+#test_X <- cbind(test_mutation, test_origin)
+#test_y <- X_primary_site[-train_indices,]
+```
+
+```{r svm, echo=FALSE}
+
+svmfit = svm(x=train_X, y=train_y, kernel='linear')
 ```
